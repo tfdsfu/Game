@@ -25,28 +25,119 @@ class Mapsize(pygame.sprite.Sprite):
             sizemap = self.size
 
 
-class Board:
-    # создание поля
-    def __init__(self, width, height):
-        self.width = width
-        self.height = height
-        self.board = [[0] * width for _ in range(height)]
-        # значения по умолчанию
-        self.left = 10
-        self.top = 10
-        self.cell_size = 30
+class Tile(pygame.sprite.Sprite):
+    def __init__(self, tile_type, pos_x, pos_y):
+        self.tile_type = tile_type
+        tile_images = {
+            'wall': load_image('box.png'),
+            'empty': load_image('grass.png'),
+            'swamp1': load_image('swamp1.png'),
+            'swamp2': load_image('swamp2.png'),
+            'swamp3': load_image('swamp3.png'),
+            'swamp4': load_image('swamp4.png')
+        }
+        tile_width = tile_height = 50
+        super().__init__(tiles_group, all_sprites)
+        self.image = tile_images[tile_type]
+        self.rect = self.image.get_rect().move(
+            tile_width * pos_x, tile_height * pos_y)
 
-    # настройка внешнего вида
-    def set_view(self, left, top, cell_size):
-        self.left = left
-        self.top = top
-        self.cell_size = cell_size
 
-    def render(self, screen):
-        for i in range(self.height):
-            for j in range(self.width):
-                pygame.draw.rect(screen, (255, 2, 20), (self.left + j * self.cell_size, self.top + i * self.cell_size,
-                                                        self.cell_size, self.cell_size), 1)
+class Player(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y):
+        self.v = 1
+        self.last = (0, 0)
+        self.pos_x = pos_x
+        self.pos_y = pos_y
+        player_image = load_image('mario.png', -1)
+        self.tile_s = 50
+        super().__init__(player_group, all_sprites)
+        self.image = player_image
+        self.rect = self.image.get_rect().move(
+            self.tile_s * pos_x, self.tile_s * pos_y)
+
+    def WS(self, k):
+        x = self.rect[0]
+        y = self.rect[1]
+        k = int(k * self.v)
+        self.last = (k * self.v, 'y')
+        print(self.rect)
+        self.rect = self.image.get_rect().move(
+            x + k, y)
+
+    def AD(self, k):
+        x = self.rect[0]
+        y = self.rect[1]
+        k = int(k * self.v)
+        print(self.rect)
+        self.last = (k * self.v, 'x')
+        self.rect = self.image.get_rect().move(
+            x, y + k)
+
+    def update(self):
+        if pygame.sprite.spritecollideany(self, tiles_group):
+            if pygame.sprite.spritecollideany(self, tiles_group).tile_type == 'wall':
+                if self.last[1] == 'y':
+                    self.rect = self.image.get_rect().move(
+                        self.rect[0] - self.last[0], self.rect[1])
+                if self.last[1] == 'x':
+                    self.rect = self.image.get_rect().move(
+                        self.rect[0], self.rect[1] - self.last[0])
+            if 'swamp' in pygame.sprite.spritecollideany(self, tiles_group).tile_type:
+                self.v = 0.2
+            else:
+                self.rect[0] = self.rect[0] - self.rect[0] % 50
+                self.rect[1] = self.rect[1] - self.rect[1] % 50
+                self.v = 1
+
+
+class Zombie(pygame.sprite.Sprite):
+    def __init__(self, player, pos_x, pos_y):
+        self.player = player
+        self.last = (0,0)
+        self.pos_x = pos_x
+        self.pos_y = pos_y
+        zombie_image = load_image('zombie.png', -1)
+        self.tile_s = 50
+        super().__init__(zombies_group, all_sprites)
+        self.image = zombie_image
+        self.rect = self.image.get_rect().move(
+            self.tile_s * pos_x, self.tile_s * pos_y)
+    def move(self):
+        x = self.rect[0]
+        y = self.rect[1]
+        if self.player.rect[0] > x:
+            self.rect = self.image.get_rect().move(x + 50, y)
+            self.last = (x, y)
+        if self.player.rect[0] == x:
+            if self.player.rect[1] > y:
+                self.rect = self.image.get_rect().move(x, y + 50)
+                self.last = (x, y)
+            if self.player.rect[1] == y:
+                self.rect = self.image.get_rect().move(x, y)
+            if self.player.rect[1] < y:
+                self.rect = self.image.get_rect().move(x, y - 50)
+                self.last = (x, y)
+        if self.player.rect[0] < x:
+            self.rect = self.image.get_rect().move(x - 50, y)
+            self.last = (x, y)
+
+
+    def update(self):
+        if pygame.sprite.spritecollideany(self, player_group):
+            pygame.time.set_timer(LOSERVENTTYPE, 20)
+            print('lose')
+        if pygame.sprite.spritecollideany(self, tiles_group):
+            if pygame.sprite.spritecollideany(self, tiles_group).tile_type == 'wall':
+                    self.rect = self.image.get_rect().move(self.last[0], self.last[1])
+        if pygame.sprite.spritecollideany(self, zombies_group):
+            el = pygame.sprite.spritecollideany(self, zombies_group)
+            self.rect = self.image.get_rect().move(self.rect.x + 50, self.rect.y + 50)
+            el.rect = el.image.get_rect().move(el.rect.x - 50, el.rect.y - 50)
+
+
+
+
 
 
 def load_image(name, colorkey=None):
@@ -72,15 +163,22 @@ def terminate():
 
 
 def start_screen():
-    intro_text = ["Мда моя игра", "",
+    size = width, height = 800, 400
+    screen = pygame.display.set_mode(size)
+    intro_text = ["",
                   "Выбери размер карты",
                   "100/100",
-                  "400/400"]
+                  "200/160"]
     fon = pygame.transform.scale(load_image('fon.jpg'), (width, height))
     screen.blit(fon, (0, 0))
-
+    fontzag = pygame.font.Font(pygame.font.match_font('franklingothicdemiкурсив'), 70)
+    string_rendered = fontzag.render("Sixty seconds to die", 1, pygame.Color('red'))
+    intro_rect = string_rendered.get_rect()
+    intro_rect.x = 70
+    intro_rect.y = 30
+    screen.blit(string_rendered, intro_rect)
     font = pygame.font.Font(None, 30)
-    text_coord = 50
+    text_coord = 150
     for line in intro_text:
         string_rendered = font.render(line, 1, pygame.Color('red'))
         intro_rect = string_rendered.get_rect()
@@ -90,73 +188,28 @@ def start_screen():
         text_coord += intro_rect.height
         intro = tuple(intro_rect)
         screen.blit(string_rendered, intro_rect)
-        if intro_text.index(line) > 2:
+        if intro_text.index(line) > 1:
             Mapsize(string_rendered, intro, int(line.split('/')[0]))
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
-            elif event.type == pygame.KEYDOWN or \
-                    event.type == pygame.MOUSEBUTTONDOWN:
-                print(event.pos)
             map_size.update(event)
-
             if sizemap:
                 print('lll')
-                return sizemap
+                if sizemap == 100:
+                    print('+++++++')
+                    player, zomb_list = generate_level(load_level('map1.txt'))
+                    size = width, height = 500, 500
+                    screen = pygame.display.set_mode(size)
+                if sizemap == 200:
+                    player, zomb_list = generate_level(load_level('map2.txt'))
+                    size = width, height = 1000, 800
+                    screen = pygame.display.set_mode(size)
+                pygame.time.set_timer(MYEVENTTYPE, 16000)
+                pygame.time.set_timer(ZOVMBEVENTTYPE, 500)
+                return player, zomb_list
             pygame.display.flip()
-
-
-class Tile(pygame.sprite.Sprite):
-    def __init__(self, tile_type, pos_x, pos_y):
-        self.tile_type = tile_type
-        tile_images = {
-            'wall': load_image('box.png'),
-            'empty': load_image('grass.png')
-        }
-        tile_width = tile_height = 50
-        super().__init__(tiles_group, all_sprites)
-        self.image = tile_images[tile_type]
-        self.rect = self.image.get_rect().move(
-            tile_width * pos_x, tile_height * pos_y)
-
-
-class Player(pygame.sprite.Sprite):
-    def __init__(self, pos_x, pos_y):
-        self.last = 0
-        self.pos_x = pos_x
-        self.pos_y = pos_y
-        player_image = load_image('mario.png', -1)
-        self.tile_s = 50
-        super().__init__(player_group, all_sprites)
-        self.image = player_image
-        self.rect = self.image.get_rect().move(
-            self.tile_s * pos_x, self.tile_s * pos_y)
-
-    def WS(self, k):
-        x = self.rect[0]
-        y = self.rect[1]
-        self.last = (k, 'y')
-        print(self.rect)
-        self.rect = self.image.get_rect().move(
-            x + k, y)
-
-    def AD(self, k):
-        x = self.rect[0]
-        y = self.rect[1]
-        self.last = (k, 'x')
-        self.rect = self.image.get_rect().move(
-            x, y + k)
-
-    def update(self):
-        if pygame.sprite.spritecollideany(self, tiles_group):
-            if pygame.sprite.spritecollideany(self, tiles_group).tile_type == 'wall':
-                if self.last[1] == 'y':
-                    self.rect = self.image.get_rect().move(
-                        self.rect[0] - self.last[0], self.rect[1])
-                if self.last[1] == 'x':
-                    self.rect = self.image.get_rect().move(
-                        self.rect[0], self.rect[1]- self.last[0])
 
 
 def load_level(filename):
@@ -174,17 +227,89 @@ def load_level(filename):
 
 def generate_level(level):
     new_player, x, y = None, None, None
+    zomb_list = list()
+    zomb_coord_list = list()
     for y in range(len(level)):
         for x in range(len(level[y])):
             if level[y][x] == '.':
                 Tile('empty', x, y)
             elif level[y][x] == '#':
                 Tile('wall', x, y)
+            elif level[y][x] == '1':
+                Tile('swamp1', x, y)
+            elif level[y][x] == '2':
+                Tile('swamp2', x, y)
+            elif level[y][x] == '3':
+                Tile('swamp3', x, y)
+            elif level[y][x] == '4':
+                Tile('swamp4', x, y)
             elif level[y][x] == '@':
                 Tile('empty', x, y)
-                new_player = Player(x, y)
+                coord = (x, y)
+            elif level[y][x] == '!':
+                Tile('empty', x, y)
+                zomb_coord_list.append((x, y))
+    new_player = Player(*coord)
+    for i in zomb_coord_list:
+        zomb_list.append(Zombie(new_player, i[0], i[1]))
     # вернем игрока, а также размер поля в клетках
-    return new_player, x, y
+    return new_player, zomb_list
+
+
+def lose():
+    running = True
+    size = width, height = 800, 400
+    screen = pygame.display.set_mode(size)
+    fon = pygame.transform.scale(load_image('fon_lose.jpg'), (width, height))
+    screen.blit(fon, (0, 0))
+    font = pygame.font.Font(pygame.font.match_font('franklingothicdemiкурсив'), 70)
+    string_rendered = font.render('Смерть', 1, pygame.Color('red'))
+    intro_rect = string_rendered.get_rect()
+    intro_rect.x = 400 - (intro_rect[2] * 0.5)
+    intro_rect.y = 200 - (intro_rect[3] * 0.5)
+    screen.blit(string_rendered, intro_rect)
+    font1 = pygame.font.Font(pygame.font.match_font('comicsansms'), 24)
+    string_rendered1 = font1.render('Для выхода нажмите клавишу Е', 1, pygame.Color('red'))
+    intro_rect1 = string_rendered1.get_rect()
+    intro_rect1.x = 100
+    intro_rect1.y = 300
+    screen.blit(string_rendered1, intro_rect1)
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_e:
+                    running = False
+        pygame.display.flip()
+
+def win():
+    running = True
+    size = width, height = 800, 400
+    screen = pygame.display.set_mode(size)
+    fon = pygame.transform.scale(load_image('fon_win.jpg'), (width, height))
+    screen.blit(fon, (0, 0))
+    font = pygame.font.Font(pygame.font.match_font('franklingothicdemiкурсив'), 70)
+    string_rendered = font.render('Победа!!!', 1, pygame.Color('red'))
+    intro_rect = string_rendered.get_rect()
+    intro_rect.x = 400 - (intro_rect[2] * 0.5)
+    intro_rect.y = 200 - (intro_rect[3] * 0.5)
+    screen.blit(string_rendered, intro_rect)
+    font1 = pygame.font.Font(pygame.font.match_font('comicsansms'), 24)
+    string_rendered1 = font1.render('Для выхода нажмите  клавишу Е', 1, pygame.Color('red'))
+    intro_rect1 = string_rendered1.get_rect()
+    intro_rect1.x = 100
+    intro_rect1.y = 300
+    screen.blit(string_rendered1, intro_rect1)
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_e:
+                    running = False
+        pygame.display.flip()
+
 
 
 if __name__ == '__main__':
@@ -198,34 +323,40 @@ if __name__ == '__main__':
     map_size = pygame.sprite.Group()
     tiles_group = pygame.sprite.Group()
     player_group = pygame.sprite.Group()
-    sizemap = start_screen()
-    if sizemap == 100:
-        player, level_x, level_y = generate_level(load_level('map1.txt'))
-        size = width, height = 500, 500
-        screen = pygame.display.set_mode(size)
-    if sizemap == 400:
-        player, level_x, level_y = generate_level(load_level('map2.txt'))
-        size = width, height = 2000, 2000
-        screen = pygame.display.set_mode(size)
+    zombies_group = pygame.sprite.Group()
+    MYEVENTTYPE = pygame.USEREVENT + 1
+    ZOVMBEVENTTYPE = pygame.USEREVENT + 2
+    LOSERVENTTYPE = pygame.USEREVENT + 3
+    player, zomb_list = start_screen()
+    fps = 120
+    clock = pygame.time.Clock()
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == MYEVENTTYPE:
+                win()
+                running = False
+            if event.type == ZOVMBEVENTTYPE:
+                print('uu')
+                for zomb in zomb_list:
+                    zomb.move()
+                pygame.time.set_timer(ZOVMBEVENTTYPE, 500)
+            if event.type == LOSERVENTTYPE:
+                lose()
+                running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_d:
-                    print('7')
-                    player.WS(25)
+                    player.WS(50)
                 if event.key == pygame.K_a:
-                    print('7')
-                    player.WS(-25)
+                    player.WS(-50)
                 if event.key == pygame.K_s:
-                    print('7')
-                    player.AD(25)
+                    player.AD(50)
                 if event.key == pygame.K_w:
-                    print('7')
-                    player.AD(-25)
-        screen.fill((0, 0, 0))
+                    player.AD(-50)
         all_sprites.draw(screen)
         all_sprites.update()
+        clock.tick(fps)
         pygame.display.flip()
     pygame.quit()
